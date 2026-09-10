@@ -1,0 +1,44 @@
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, HttpUrl
+
+from app import storage
+from app.shortcode import generate_code
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    storage.init_db()
+    yield
+
+
+app = FastAPI(title="LinkShrink", lifespan=lifespan)
+
+
+class ShortenRequest(BaseModel):
+    url: HttpUrl
+
+
+class ShortenResponse(BaseModel):
+    code: str
+    short_url: str
+
+
+@app.post("/links", response_model=ShortenResponse)
+def shorten(req: ShortenRequest):
+    code = generate_code()
+    while storage.get_link(code):
+        code = generate_code()
+    storage.insert_link(code, str(req.url), datetime.now(timezone.utc).isoformat())
+    return ShortenResponse(code=code, short_url=f"/{code}")
+
+
+@app.get("/{code}")
+def redirect(code: str):
+    link = storage.get_link(code)
+    if not link:
+        raise HTTPException(status_code=404, detail="short code not found")
+    return RedirectResponse(url=link["url"], status_code=307)
