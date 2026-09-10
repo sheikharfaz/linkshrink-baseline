@@ -20,7 +20,9 @@ def init_db(db_path=None):
             CREATE TABLE IF NOT EXISTS links (
                 code TEXT PRIMARY KEY,
                 url TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                click_count INTEGER NOT NULL DEFAULT 0,
+                last_clicked_at TEXT
             )
         """)
         conn.commit()
@@ -39,3 +41,12 @@ def get_link(code, db_path=None):
     with get_conn(db_path) as conn:
         row = conn.execute("SELECT * FROM links WHERE code = ?", (code,)).fetchone()
         return dict(row) if row else None
+
+
+def record_click(code, clicked_at, db_path=None):
+    with get_conn(db_path) as conn:
+        conn.execute(
+            "UPDATE links SET click_count = click_count + 1, last_clicked_at = ? WHERE code = ?",
+            (clicked_at, code),
+        )
+        conn.commit()

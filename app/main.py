@@ -27,6 +27,14 @@ class ShortenResponse(BaseModel):
     short_url: str
 
 
+class StatsResponse(BaseModel):
+    code: str
+    url: str
+    click_count: int
+    created_at: str
+    last_clicked_at: str | None = None
+
+
 @app.post("/links", response_model=ShortenResponse)
 def shorten(req: ShortenRequest):
     code = generate_code()
@@ -36,9 +44,18 @@ def shorten(req: ShortenRequest):
     return ShortenResponse(code=code, short_url=f"/{code}")
 
 
+@app.get("/links/{code}/stats", response_model=StatsResponse)
+def stats(code: str):
+    link = storage.get_link(code)
+    if not link:
+        raise HTTPException(status_code=404, detail="short code not found")
+    return StatsResponse(**link)
+
+
 @app.get("/{code}")
 def redirect(code: str):
     link = storage.get_link(code)
     if not link:
         raise HTTPException(status_code=404, detail="short code not found")
+    storage.record_click(code, datetime.now(timezone.utc).isoformat())
     return RedirectResponse(url=link["url"], status_code=307)
