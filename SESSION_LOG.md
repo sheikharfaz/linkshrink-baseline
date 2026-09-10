@@ -140,7 +140,7 @@ for an existing code before minting a new one; `tests/test_validation.py`
 | New dependencies added | 1 (`slowapi`) — no proposal, no approval, no ledger |
 | PRD/TRD/recap artifacts produced | 0 |
 | Final test count | 9, all passing |
-| Final app code | 4 files, 199 lines (`app/`) |
+| Final app code | 4 files, 140 lines (`app/`) — byte-for-byte identical to `linkshrink-agent-memory-kit`'s (`diff` confirms it), on purpose: this comparison is about process, not code quality |
 
 This ≈1,993-token figure is the pure cost of *not remembering the previous
 session* — the same three-to-four files getting re-read from scratch at
