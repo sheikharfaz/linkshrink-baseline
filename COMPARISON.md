@@ -13,26 +13,28 @@ both repos, on purpose — read it from whichever one you found first.)
 
 ## TL;DR
 
-| | linkshrink-baseline | linkshrink-agent-memory-kit (as first measured) | linkshrink-agent-memory-kit (after the upstream fix) |
-|---|---|---|---|
-| Context tokens, Sessions 2–4 | **≈1,993** | ≈4,004 | **≈1,676** |
-| How that context was recovered | full-file re-reads each session | map + targeted queries + session recall | same, with a leaner map |
-| New dependency (`slowapi`) | pip-installed directly, no record of why | proposed → approved → installed → logged to an audit ledger | — same — |
-| PRD/TRD per feature | none | 4 (one pair per session, in `.agent/work/`) | — same — |
-| Closing recap per session | none | 4 (kept local — see agent-memory-kit's privacy stance) | — same — |
-| Cross-session continuity | re-derived from scratch each time | `session-memory` recall (real output logged per session) | — same — |
-| Final tests | 9 passing | 9 passing | 9 passing |
-| Final application code | 140 lines | 140 lines, byte-for-byte identical | — same — |
-| Real bugs found in the tooling itself | — | 1 (`dev-recap`'s `gaps`, fixed during Session 2) | +1 more (map-bloat root cause, fixed after this write-up shipped) |
+| | linkshrink-baseline | kit, as first measured | kit, round 1 fix | kit, round 2 fix |
+|---|---|---|---|---|
+| Context tokens, Sessions 2–4 | **≈1,993** | ≈4,004 | ≈1,676 | **≈1,430** |
+| How that context was recovered | full-file re-reads each session | map + targeted queries + session recall | same, leaner map | same, leaner map + queries |
+| New dependency (`slowapi`) | pip-installed directly, no record of why | proposed → approved → installed → logged to an audit ledger | — same — | — same — |
+| PRD/TRD per feature | none | 4 (one pair per session, in `.agent/work/`) | — same — | — same — |
+| Closing recap per session | none | 4 (kept local — see agent-memory-kit's privacy stance) | — same — | — same — |
+| Cross-session continuity | re-derived from scratch each time | `session-memory` recall (real output logged per session) | — same — | — same — |
+| Final tests | 9 passing | 9 passing | 9 passing | 9 passing |
+| Final application code | 140 lines | 140 lines, byte-for-byte identical | — same — | — same — |
+| Real bugs found in the tooling | — | 1 (`dev-recap`'s `gaps`) | +1 (map-bloat root cause) | — |
 
 **As first measured, the kit used *more* tokens here, not fewer** —
-≈4,004 vs. baseline's ≈1,993. That number was real, and reported plainly
-below at the time. It led to a real fix upstream (see
-[Update — the upstream fix](#update--the-upstream-fix)); the current,
-post-fix number is ≈1,676 — 16% *below* baseline, not the roughly 2x-worse
-result this document originally led with. Both numbers are kept here, on
-purpose — see [Why the token result flips at scale](#why-the-token-result-flips-at-scale)
-for the parts of the explanation that are still true either way.
+≈4,004 vs. baseline's ≈1,993. Two real rounds of upstream fixes later,
+it's ≈1,430 — **28% below baseline**, not the roughly 2x-worse result
+this document originally led with, and also honestly not below *half* of
+it. All three numbers are kept here on purpose — see
+[Update — the upstream fix](#update--the-upstream-fix) and
+[Update 2 — pushed below half, hit a real ceiling](#update-2--pushed-below-half-hit-a-real-ceiling)
+for what changed each round, and
+[Why the token result flips at scale](#why-the-token-result-flips-at-scale)
+for the parts of the explanation that were true from the start.
 
 ## Methodology
 
@@ -138,6 +140,43 @@ the map every session" as a hard rule — both would trade away the thing
 throughout this document and `SESSION_LOG.md` rather than edited away,
 because the fix it led to is a better piece of evidence than a clean
 result would have been.
+
+## Update 2 — pushed below half, hit a real ceiling
+
+Asked to get the kit-assisted total under *half* of baseline (≈996
+tokens). Two more real, tested rounds landed upstream — same rule as
+round 1, drop no information, only the ceremony around it: `Stack`/entry
+points/HTTP surface merge into one section when the surface is small
+enough to name in a few lines; the module table only appears once
+there's enough to tabulate; `Coverage`'s four bullets condense to two;
+`query.py file`'s symbol list becomes one comma-joined line instead of
+one padded line per symbol. Full detail in
+[linkshrink-agent-memory-kit/SESSION_LOG.md](https://github.com/sheikharfaz/linkshrink-agent-memory-kit/blob/main/SESSION_LOG.md#update-2--asked-to-push-below-half-pushed-again-reported-the-real-ceiling).
+
+| Session | Round 1 | Round 2 | Baseline |
+|---|---|---|---|
+| 2 | 511 | 431 | 734 |
+| 3 | 498 | 429 | 391 |
+| 4 | 667 | 570 | 868 |
+| **Total** | **≈1,676** | **≈1,430** | **≈1,993** |
+
+**≈1,430 tokens — 28% below baseline, still not under half.** Three
+sustained rounds took the kit from 2x-worse than baseline to
+meaningfully-better, with a growing margin each round — and each round
+was a real, defensible simplification, not a trick to move a number. The
+remaining ≈434-token gap is now smaller than what's left to cut without
+crossing a line: the map's floor for a genuine multi-file Python project
+(stack, entry points, routes, modules, coverage, the accuracy caveats) is
+already down to ~280–320 tokens per session — cutting further means
+dropping a fact, not tightening its prose. Skipping the map on an
+unchanged codebase could close the rest, but every session in this demo
+*does* change the codebase by construction, so that lever has nothing to
+work with here even though it would help the far more common real case of
+several read-only sessions between edits. The honest report: this
+specific, deliberately tiny project's ceiling is "beats baseline by a
+real and growing margin," not "half" — `agent-memory-kit`'s own benchmark
+suite is where "half, and much more," actually shows up, once a codebase
+is large enough for a map to be worth having at all.
 
 ## What doesn't show up in the token count
 
