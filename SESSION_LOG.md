@@ -68,3 +68,33 @@ wired click recording into the redirect handler in `app/main.py`;
 | app/storage.py | 52 |
 | app/main.py | 61 |
 | tests/test_stats.py | 43 |
+
+---
+
+## Session 3 — Rate limiting
+
+**Simulated as:** a new session, no memory of Sessions 1–2. Re-read
+`app/main.py` in full to see the current route shape before adding a
+limiter to the right endpoint.
+
+**Context read this session:**
+
+| File read in full | Chars | ≈ Tokens |
+|---|---|---|
+| app/main.py | 1,562 | 391 |
+
+**New dependency decision:** chose `slowapi` and added it straight to
+`requirements.txt` + ran `pip install slowapi` — no proposal, no approval
+step, no record of why it was chosen or what else was considered. That
+decision and its rationale exist only in this commit message and this log
+entry, written after the fact.
+
+**Built:** `Limiter` wired into `app/main.py`, `@limiter.limit("5/minute")`
+on `POST /links`; `tests/test_rate_limit.py` (2 new tests).
+
+**Verification:** `python3 -m pytest tests/ -v` → 7 passed.
+
+| File (after this session) | Lines |
+|---|---|
+| app/main.py | 69 |
+| tests/test_rate_limit.py | 28 |

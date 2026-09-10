@@ -1,9 +1,12 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, HttpUrl
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app import storage
 from app.shortcode import generate_code
@@ -16,6 +19,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LinkShrink", lifespan=lifespan)
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class ShortenRequest(BaseModel):
@@ -36,7 +43,8 @@ class StatsResponse(BaseModel):
 
 
 @app.post("/links", response_model=ShortenResponse)
-def shorten(req: ShortenRequest):
+@limiter.limit("5/minute")
+def shorten(request: Request, req: ShortenRequest):
     code = generate_code()
     while storage.get_link(code):
         code = generate_code()
