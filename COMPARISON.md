@@ -13,22 +13,26 @@ both repos, on purpose — read it from whichever one you found first.)
 
 ## TL;DR
 
-| | linkshrink-baseline | linkshrink-agent-memory-kit |
-|---|---|---|
-| Context tokens, Sessions 2–4 | **≈1,993** | **≈4,004** |
-| How that context was recovered | full-file re-reads each session | map + targeted queries + session recall |
-| New dependency (`slowapi`) | pip-installed directly, no record of why | proposed → approved → installed → logged to an audit ledger |
-| PRD/TRD per feature | none | 4 (one pair per session, in `.agent/work/`) |
-| Closing recap per session | none | 4 (kept local — see agent-memory-kit's privacy stance) |
-| Cross-session continuity | re-derived from scratch each time | `session-memory` recall (real output logged per session) |
-| Final tests | 9 passing | 9 passing |
-| Final application code | 140 lines | 140 lines, byte-for-byte identical |
-| Real bugs found in the tooling itself | — | 1 (fixed upstream during Session 2) |
+| | linkshrink-baseline | linkshrink-agent-memory-kit (as first measured) | linkshrink-agent-memory-kit (after the upstream fix) |
+|---|---|---|---|
+| Context tokens, Sessions 2–4 | **≈1,993** | ≈4,004 | **≈1,676** |
+| How that context was recovered | full-file re-reads each session | map + targeted queries + session recall | same, with a leaner map |
+| New dependency (`slowapi`) | pip-installed directly, no record of why | proposed → approved → installed → logged to an audit ledger | — same — |
+| PRD/TRD per feature | none | 4 (one pair per session, in `.agent/work/`) | — same — |
+| Closing recap per session | none | 4 (kept local — see agent-memory-kit's privacy stance) | — same — |
+| Cross-session continuity | re-derived from scratch each time | `session-memory` recall (real output logged per session) | — same — |
+| Final tests | 9 passing | 9 passing | 9 passing |
+| Final application code | 140 lines | 140 lines, byte-for-byte identical | — same — |
+| Real bugs found in the tooling itself | — | 1 (`dev-recap`'s `gaps`, fixed during Session 2) | +1 more (map-bloat root cause, fixed after this write-up shipped) |
 
-**Read the token row correctly: the kit used *more* tokens here, not
-fewer.** That is the honest result at this project's scale (4–5 source
-files), explained below — and it is not the result you'd get on a real
-codebase; see [Why the token result flips at scale](#why-the-token-result-flips-at-scale).
+**As first measured, the kit used *more* tokens here, not fewer** —
+≈4,004 vs. baseline's ≈1,993. That number was real, and reported plainly
+below at the time. It led to a real fix upstream (see
+[Update — the upstream fix](#update--the-upstream-fix)); the current,
+post-fix number is ≈1,676 — 16% *below* baseline, not the roughly 2x-worse
+result this document originally led with. Both numbers are kept here, on
+purpose — see [Why the token result flips at scale](#why-the-token-result-flips-at-scale)
+for the parts of the explanation that are still true either way.
 
 ## Methodology
 
@@ -91,6 +95,50 @@ what makes them a fair, honest complement to the large-repo benchmark
 rather than a redundant one. A demo that only ever showed favorable
 numbers would be a worse piece of evidence than this one.
 
+## Update — the upstream fix
+
+The ≈4,004-token result above wasn't the full explanation it looked like.
+Investigating it turned up a real, fixable defect: `CODEBASE_MAP.md` was
+including `.agent/skills/` — this kit's own *vendored* scripts, copied
+into every consumer repo by its installer — as if they were
+`linkshrink-agent-memory-kit`'s own source. 93% of the LOC that map was
+summarizing was kit-internal code, not this repo's actual app.
+
+Fixed upstream in
+[`agent-memory-kit@55f7b3f`](https://github.com/sheikharfaz/agent-memory-kit/commit/55f7b3f):
+`.agent/skills/` excluded from indexing by default (an `.agentignore`
+`!pattern` negation opts it back in — the one real case is
+`agent-memory-kit`'s own repo, where it genuinely is the source), plus
+three rounds of tightening the map's fixed-overhead sections without
+removing any of the information they carry — denser prose, zero-symbol
+modules summarized in one line instead of a full table row each, and the
+"Hubs" section requiring 2+ callers instead of 1+ (a symbol called from
+exactly one place isn't a hub).
+
+Recomputed with the fixed kit, same methodology, real commands re-run
+against this repo's actual history — full breakdown in
+[linkshrink-agent-memory-kit/SESSION_LOG.md](https://github.com/sheikharfaz/linkshrink-agent-memory-kit/blob/main/SESSION_LOG.md#update--agent-memory-kit-was-improved-based-on-this-finding):
+
+| Session | Old kit-assisted | New kit-assisted | Baseline |
+|---|---|---|---|
+| 2 | 1,293 | 511 | 734 |
+| 3 | 1,271 | 498 | 391 |
+| 4 | 1,440 | 667 | 868 |
+| **Total** | **≈4,004** | **≈1,676** | **≈1,993** |
+
+The kit-assisted total is now below baseline overall (≈1,676 vs. ≈1,993,
+~16% fewer), though not literally half — Session 4 alone (four separate
+`query.py` calls plus a larger recall) still costs a bit more than
+baseline's single three-file re-read, because the crossover point depends
+on how many distinct things one session touches, not only on repo size.
+Getting below that would mean either shrinking the map below what a real
+multi-file project's structure actually needs to say, or dropping "read
+the map every session" as a hard rule — both would trade away the thing
+`codebase-memory` is actually for. The original ≈4,004 number is kept
+throughout this document and `SESSION_LOG.md` rather than edited away,
+because the fix it led to is a better piece of evidence than a clean
+result would have been.
+
 ## What doesn't show up in the token count
 
 - **An audit trail for the new dependency.** `slowapi` isn't in
@@ -108,31 +156,33 @@ numbers would be a worse piece of evidence than this one.
   considered, testing strategy, blast radius) for every one of the 4
   sessions. `linkshrink-baseline` has none of that — the request and the
   diff are the only record of intent.
-- **A real bug in the tooling itself, found and fixed mid-build.**
-  `dev-recap`'s `gaps` scanner was checking the wrong JSON field name
-  against `codebase-memory`'s index and always reported indexed files as
-  unindexed. Building `linkshrink-agent-memory-kit` for real (not a
-  scripted demo) surfaced it in Session 2; it's fixed upstream in
-  `agent-memory-kit`, with 3 new regression tests, and the fix is already
-  reflected in that repo's copy of the script from Session 2 onward. This
-  is arguably the most valuable thing this whole exercise produced — a
-  real defect in a tool that had already shipped, found by actually using
-  it on a real (if small) project instead of only ever running it against
+- **Two real bugs in the tooling itself, found and fixed by building this
+  for real.** `dev-recap`'s `gaps` scanner was checking the wrong JSON
+  field name against `codebase-memory`'s index and always reported
+  indexed files as unindexed — surfaced in Session 2, fixed upstream with
+  3 regression tests. Separately, the map-bloat root cause behind the
+  ≈4,004-token result (`.agent/skills/` being indexed as if it were this
+  repo's own source) — fixed upstream with 6 more regression tests; see
+  [Update — the upstream fix](#update--the-upstream-fix). This is
+  arguably the most valuable thing this whole exercise produced — real
+  defects in a tool that had already shipped, found by actually using it
+  on a real (if small) project instead of only ever running it against
   itself.
 
 ## What this comparison does not prove
 
-Not that `agent-memory-kit` makes every project cheaper — Session 2–4's
-own numbers say otherwise at this scale. Not that the resulting code is
-better — it's identical in both repos by construction, since that wasn't
-the variable under test. Not a claim about answer quality, bug rate, or
+Not that `agent-memory-kit` makes every individual session cheaper —
+Session 4's own number still costs a bit more than baseline's, even after
+the fix (see the Update section). Not that the resulting code is better —
+it's identical in both repos by construction, since that wasn't the
+variable under test. Not a claim about answer quality, bug rate, or
 development speed — none of those were measured. What it does show,
 plainly, with real commands and real output committed alongside the
 claims: what `linkshrink-agent-memory-kit`'s process produces that
 `linkshrink-baseline`'s doesn't (a PRD/TRD trail, a tool-install audit
-log, cross-session recall that survived closing the session), and an
-honest accounting of what that process costs in tokens, including the
-case where it costs more.
+log, cross-session recall that survived closing the session), an honest
+first measurement including the case where it cost more, and what
+happened when that result was investigated instead of hidden.
 
 ## See also
 

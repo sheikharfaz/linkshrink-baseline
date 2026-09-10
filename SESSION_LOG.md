@@ -149,3 +149,9 @@ forward. It does not include the tokens spent actually reasoning about or
 writing the new code in each session, which both repos pay equally and
 which this comparison isn't about.
 
+This number stayed the reference point throughout — it's the companion
+repo, [linkshrink-agent-memory-kit](https://github.com/sheikharfaz/linkshrink-agent-memory-kit),
+that changed after its first measurement turned up a real bug in
+`agent-memory-kit`; see that repo's `SESSION_LOG.md` and
+[`COMPARISON.md`](COMPARISON.md) for the full before/after.
+
