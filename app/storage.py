@@ -43,6 +43,12 @@ def get_link(code, db_path=None):
         return dict(row) if row else None
 
 
+def get_link_by_url(url, db_path=None):
+    with get_conn(db_path) as conn:
+        row = conn.execute("SELECT * FROM links WHERE url = ?", (url,)).fetchone()
+        return dict(row) if row else None
+
+
 def record_click(code, clicked_at, db_path=None):
     with get_conn(db_path) as conn:
         conn.execute(

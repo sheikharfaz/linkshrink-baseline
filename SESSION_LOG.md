@@ -98,3 +98,54 @@ on `POST /links`; `tests/test_rate_limit.py` (2 new tests).
 |---|---|
 | app/main.py | 69 |
 | tests/test_rate_limit.py | 28 |
+
+---
+
+## Session 4 — Validation, dedup, docs
+
+**Simulated as:** a new session, no memory of Sessions 1–3. Re-read
+`app/main.py`, `app/storage.py`, and `app/shortcode.py` in full to check
+what validation already existed (pydantic's `HttpUrl` — found by reading,
+not by asking) before adding dedup logic.
+
+**Context read this session:**
+
+| File read in full | Chars | ≈ Tokens |
+|---|---|---|
+| app/main.py | 1,914 | 479 |
+| app/storage.py | 1,393 | 348 |
+| app/shortcode.py | 163 | 41 |
+| **Total** | **3,470** | **≈ 868** |
+
+**Built:** `get_link_by_url()` in `app/storage.py`; `shorten()` now checks
+for an existing code before minting a new one; `tests/test_validation.py`
+(2 new tests); this README.
+
+**Verification:** `python3 -m pytest tests/ -v` → 9 passed.
+
+| File (after this session) | Lines |
+|---|---|
+| app/main.py | 74 |
+| app/storage.py | 58 |
+| tests/test_validation.py | 26 |
+
+---
+
+## Totals across all 4 sessions
+
+| | |
+|---|---|
+| Context re-read to recover lost session memory (Sessions 2–4) | **≈ 1,993 tokens** (734 + 391 + 868, summed per-session) from 7,966 chars re-read (2,934 + 1,562 + 3,470) |
+| Files read in full (cumulative, with re-reads counted each time) | 8 |
+| New dependencies added | 1 (`slowapi`) — no proposal, no approval, no ledger |
+| PRD/TRD/recap artifacts produced | 0 |
+| Final test count | 9, all passing |
+| Final app code | 4 files, 199 lines (`app/`) |
+
+This ≈1,993-token figure is the pure cost of *not remembering the previous
+session* — the same three-to-four files getting re-read from scratch at
+the start of Sessions 2, 3, and 4 because nothing carried the context
+forward. It does not include the tokens spent actually reasoning about or
+writing the new code in each session, which both repos pay equally and
+which this comparison isn't about.
+

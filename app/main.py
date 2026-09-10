@@ -45,10 +45,15 @@ class StatsResponse(BaseModel):
 @app.post("/links", response_model=ShortenResponse)
 @limiter.limit("5/minute")
 def shorten(request: Request, req: ShortenRequest):
+    url = str(req.url)
+    existing = storage.get_link_by_url(url)
+    if existing:
+        return ShortenResponse(code=existing["code"], short_url=f"/{existing['code']}")
+
     code = generate_code()
     while storage.get_link(code):
         code = generate_code()
-    storage.insert_link(code, str(req.url), datetime.now(timezone.utc).isoformat())
+    storage.insert_link(code, url, datetime.now(timezone.utc).isoformat())
     return ShortenResponse(code=code, short_url=f"/{code}")
 
 
